@@ -20,6 +20,8 @@ Valid options are:
                 (If not given, ipset rules will not be generated.)
     -o, --output <FILE>
                 /path/to/output_filename
+    -r, --runtime <FILE>
+                /path/to/runtime_filename
     -i, --insecure
                 Force bypass certificate validation (insecure)
     -l, --domain-list
@@ -101,6 +103,10 @@ get_args(){
                 EXTRA_DOMAIN_FILE="$2"
                 shift
                 ;;
+            --runtime | -r)
+                RUNTIME_FILE="$2"
+                shift
+                ;;
             *)
                 echo "Invalid argument: $1"
                 usage 1
@@ -152,11 +158,6 @@ get_args(){
             fi
         fi
     fi
-
-    if [ ! -z $EXTRA_DOMAIN_FILE ] && [ ! -f $EXTRA_DOMAIN_FILE ]; then
-        printf '\033[33m\nWARNING:\nExtra domain file does not exist, ignored.\033[m\n\n'
-        EXTRA_DOMAIN_FILE=''
-    fi
 }
 
 process(){
@@ -206,10 +207,10 @@ process(){
     echo 'twimg.edgesuit.net... Added.'
 
     # Add extra domains
-    if [ ! -z $EXTRA_DOMAIN_FILE ]; then
+    if test -f "$EXTRA_DOMAIN_FILE"; then
         cat $EXTRA_DOMAIN_FILE >> $DOMAIN_FILE
+        echo 'Extra domain file '$EXTRA_DOMAIN_FILE'... Added.'
     fi
-    echo 'Extra domain file '$EXTRA_DOMAIN_FILE'... Added.'
 
     if [ $OUT_TYPE = 'DNSMASQ_RULES' ]; then
     # Convert domains into dnsmasq rules
@@ -234,6 +235,12 @@ ipset=/\1/'$IPSET_NAME'#g' > $CONF_TMP_FILE
 
     cp $OUT_TMP_FILE $OUT_FILE
     printf '\nConverting GfwList to '$OUT_TYPE'... Done.\n\n'
+
+    if test -f "$RUNTIME_FILE"; then
+        echo 'Restarting dnsmasq service...'
+        cp $OUT_TMP_FILE $RUNTIME_FILE
+        /etc/init.d/dnsmasq restart
+    fi
 
     # Clean up
     clean_and_exit 0
